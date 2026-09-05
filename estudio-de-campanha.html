@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estúdio de Campanha</title>
+
+<!--
+  ESTÚDIO DE CAMPANHA
+  Um arquivo só. Abra com dois cliques. Não precisa de internet nem de instalação.
+
+  Por que tudo num arquivo? Porque assim você pode mandar por e-mail, abrir no
+  notebook do cliente e apresentar sem depender de servidor, wi-fi ou build.
+
+  Mapa rápido do arquivo (use Ctrl+F para achar):
+    [1] PALETAS   -> as cores de cada humor
+    [2] BANCO     -> as palavras que viram o briefing
+    [3] TRILHAS   -> os sons de cada humor
+-->
+
+<style>
+/* ------------------------------------------------------------------
+   TEMA POR VARIÁVEIS
+   Por que variáveis? Porque o humor escolhido troca a página INTEIRA.
+   Em vez de reescrever 50 regras de CSS, o JavaScript troca 8 variáveis
+   aqui embaixo e todo o resto se ajusta sozinho.
+-------------------------------------------------------------------*/
+:root{
+  --fundo:#0D0B12;
+  --superficie:#17131F;
+  --texto:#FFFFFF;
+  --suave:#B9AEC9;
+  --linha:rgba(255,255,255,.12);
+  --acento:#FF2E4D;
+  --acento2:#FFE600;
+  --sombra:0 24px 60px rgba(0,0,0,.45);
+  /* transição lenta: a troca de humor precisa parecer "cinema", não "site" */
+  --troca:.7s cubic-bezier(.2,.7,.2,1);
+}
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--fundo);
+  color:var(--texto);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  transition:background var(--troca), color var(--troca);
+  overflow-x:hidden;
+}
+
+/* Grão sobre a tela toda: dá textura de impressão e disfarça o "cheiro de site".
+   pointer-events:none garante que essa camada nunca bloqueie um clique. */
+.grao{
+  position:fixed; inset:0; z-index:9; pointer-events:none; opacity:.05;
+  background-image:radial-gradient(circle at 1px 1px, #fff 1px, transparent 0);
+  background-size:3px 3px; mix-blend-mode:overlay;
+}
+
+.envelope{max-width:1180px; margin:0 auto; padding:28px 22px 70px}
+
+/* ---------- CABEÇALHO ---------- */
+header.topo{
+  display:flex; align-items:flex-end; justify-content:space-between;
+  gap:24px; flex-wrap:wrap; padding-bottom:22px;
+  border-bottom:1px solid var(--linha); margin-bottom:30px;
+}
+.marca{display:flex; align-items:center; gap:14px}
+/* O "selo" é um quadrado que gira devagar: sinaliza que o estúdio está vivo. */
+.selo{
+  width:42px; height:42px; border-radius:11px; flex:none;
+  background:linear-gradient(135deg,var(--acento),var(--acento2));
+  animation:respira 6s ease-in-out infinite;
+  transition:background var(--troca);
+}
+@keyframes respira{0%,100%{transform:rotate(0) scale(1)}50%{transform:rotate(8deg) scale(1.06)}}
+.marca h1{
+  margin:0; font-size:23px; letter-spacing:-.02em; font-weight:800; line-height:1.1;
+}
+.marca p{margin:3px 0 0; font-size:12.5px; color:var(--suave); letter-spacing:.04em}
+
+/* ---------- PLACAR (modo game) ---------- */
+.placar{display:flex; align-items:center; gap:20px; flex-wrap:wrap}
+.metrica{text-align:right; line-height:1}
+.metrica .numero{
+  font-size:36px; font-weight:800; letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums; display:block;
+}
+.metrica .rotulo{font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--suave)}
+/* Classe adicionada por 1 segundo pelo JS quando o placar sobe: o "pulo" comemorativo. */
+.pula{animation:pulo .6s cubic-bezier(.2,1.6,.3,1)}
+@keyframes pulo{0%{transform:scale(1)}35%{transform:scale(1.45); color:var(--acento)}100%{transform:scale(1)}}
+
+.nivel{min-width:150px}
+.barra{height:6px; border-radius:99px; background:var(--linha); overflow:hidden; margin-top:8px}
+.barra i{display:block; height:100%; width:0; border-radius:99px;
+  background:linear-gradient(90deg,var(--acento),var(--acento2)); transition:width .8s cubic-bezier(.2,.8,.2,1)}
+
+/* ---------- CONTROLES ---------- */
+.controles{
+  background:var(--superficie); border:1px solid var(--linha); border-radius:20px;
+  padding:22px; margin-bottom:26px; box-shadow:var(--sombra);
+  transition:background var(--troca), border-color var(--troca);
+}
+.grupo{margin-bottom:18px}
+.grupo > span.titulo{
+  display:block; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--suave); margin-bottom:10px;
+}
+.fichas{display:flex; gap:9px; flex-wrap:wrap}
+/* Cada "ficha" é um botão de escolha. O estado selecionado usa aria-pressed,
+   que serve tanto para o CSS quanto para leitores de tela. */
+.ficha{
+  font:inherit; font-size:13.5px; font-weight:600; cursor:pointer;
+  padding:10px 17px; border-radius:99px; color:var(--texto);
+  background:transparent; border:1px solid var(--linha);
+  transition:all .22s ease;
+}
+.ficha:hover{border-color:var(--acento); transform:translateY(-1px)}
+.ficha[aria-pressed="true"]{
+  background:var(--acento); border-color:var(--acento);
+  color:#fff; box-shadow:0 8px 24px -8px var(--acento);
+}
+/* No tema claro (minimalista) o texto do botão ativo precisa contrastar. */
+body.claro .ficha[aria-pressed="true"]{color:#fff}
+
+.acoes{display:flex; gap:12px; align-items:center; flex-wrap:wrap; padding-top:6px; border-top:1px solid var(--linha)}
+.botao-mestre{
+  font:inherit; font-size:15px; font-weight:800; letter-spacing:.02em; cursor:pointer;
+  padding:15px 30px; border-radius:99px; border:none; color:#fff;
+  background:linear-gradient(135deg,var(--acento),var(--acento2));
+  margin-top:16px; transition:transform .18s ease, box-shadow .18s ease;
+  box-shadow:0 14px 34px -12px var(--acento);
+}
+.botao-mestre:hover{transform:translateY(-2px); box-shadow:0 20px 42px -12px var(--acento)}
+.botao-mestre:active{transform:translateY(1px)}
+.botao-simples{
+  font:inherit; font-size:13px; font-weight:600; cursor:pointer; margin-top:16px;
+  padding:14px 20px; border-radius:99px; background:transparent;
+  border:1px solid var(--linha); color:var(--texto); transition:all .2s ease;
+}
+.botao-simples:hover{border-color:var(--acento); color:var(--acento)}
+
+/* ---------- PALCO: briefing à esquerda, arte à direita ---------- */
+.palco{display:grid; grid-template-columns:1.05fr .95fr; gap:26px; align-items:start}
+@media (max-width:900px){.palco{grid-template-columns:1fr}}
+
+.cartao{
+  background:var(--superficie); border:1px solid var(--linha); border-radius:20px;
+  padding:30px; box-shadow:var(--sombra);
+  transition:background var(--troca), border-color var(--troca);
+}
+/* Animação de entrada: o JS remove e recoloca a classe para "re-disparar" o efeito.
+   É o que dá a sensação de que um briefing NOVO acabou de chegar na mesa. */
+.entra{animation:entrada .55s cubic-bezier(.2,.8,.2,1)}
+@keyframes entrada{from{opacity:0; transform:translateY(14px)}to{opacity:1; transform:none}}
+
+.etiqueta{font-size:10.5px; letter-spacing:.18em; text-transform:uppercase; color:var(--acento); font-weight:700}
+.codinome{
+  margin:12px 0 0; font-size:clamp(34px,5.2vw,54px); line-height:.95;
+  font-weight:800; letter-spacing:-.035em; text-transform:uppercase;
+}
+.tagline{
+  font-family:Georgia,"Times New Roman",serif; font-style:italic;
+  font-size:clamp(19px,2.4vw,25px); line-height:1.35; margin:18px 0 0;
+  color:var(--texto); border-left:3px solid var(--acento); padding-left:16px;
+}
+.bloco{margin-top:26px; padding-top:22px; border-top:1px solid var(--linha)}
+.bloco h3{
+  margin:0 0 10px; font-size:10.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--suave); font-weight:700;
+}
+.bloco p{margin:0; font-size:15.5px; line-height:1.6; color:var(--texto)}
+
+/* Lista de posts numerada à mão (o contador do CSS) para controlar o visual do número. */
+ol.posts{list-style:none; margin:0; padding:0; counter-reset:p}
+ol.posts li{
+  counter-increment:p; position:relative; padding-left:44px; margin-bottom:16px;
+  font-size:15px; line-height:1.55;
+}
+ol.posts li::before{
+  content:counter(p,decimal-leading-zero); position:absolute; left:0; top:1px;
+  font-size:12px; font-weight:800; color:var(--acento);
+  border:1px solid var(--acento); border-radius:8px; padding:4px 7px; line-height:1;
+}
+ol.posts li b{display:block; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--suave); margin-bottom:3px; font-weight:700}
+
+/* ---------- ARTE ---------- */
+.moldura{position:relative; border-radius:20px; overflow:hidden; border:1px solid var(--linha); box-shadow:var(--sombra)}
+canvas#arte{display:block; width:100%; aspect-ratio:1/1; background:#000}
+/* Flash branco por cima da arte no momento da geração: o "clarão do estúdio". */
+.flash{position:absolute; inset:0; background:#fff; opacity:0; pointer-events:none}
+.flash.dispara{animation:clarao .5s ease-out}
+@keyframes clarao{0%{opacity:.75}100%{opacity:0}}
+
+.amostras{display:flex; gap:8px; margin-top:14px}
+.amostras i{flex:1; height:36px; border-radius:9px; border:1px solid var(--linha); transition:transform .2s ease}
+.amostras i:hover{transform:translateY(-3px)}
+
+/* ---------- MAPA DE COMBINAÇÕES (game) ---------- */
+.mapa{display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:16px}
+.mapa span{
+  height:9px; border-radius:99px; background:var(--linha); transition:all .45s ease;
+}
+.mapa span.aceso{background:linear-gradient(90deg,var(--acento),var(--acento2)); transform:scaleY(1.5)}
+
+/* ---------- CONFETE ---------- */
+/* Cada partícula é uma div solta na tela, animada e removida depois de 1,4s.
+   Poucos elementos, vida curta: comemoração sem travar a página. */
+.confete{position:fixed; width:9px; height:14px; z-index:50; pointer-events:none; border-radius:2px}
+
+footer.rodape{margin-top:40px; padding-top:20px; border-top:1px solid var(--linha); color:var(--suave); font-size:12.5px; line-height:1.7}
+kbd{background:var(--linha); border-radius:5px; padding:2px 7px; font-size:11.5px; font-family:inherit}
+</style>
+</head>
+<body>
+<div class="grao"></div>
+
+<div class="envelope">
+
+  <header class="topo">
+    <div class="marca">
+      <div class="selo"></div>
+      <div>
+        <h1>Estúdio de Campanha</h1>
+        <p id="assinatura">CONCEITO · ARTE · TRILHA · PLACAR</p>
+      </div>
+    </div>
+
+    <div class="placar">
+      <div class="metrica">
+        <span class="numero" id="contador">0</span>
+        <span class="rotulo">Briefings resolvidos</span>
+      </div>
+      <div class="metrica nivel">
+        <span class="numero" id="nivel">1</span>
+        <span class="rotulo">Nível do estúdio</span>
+        <div class="barra"><i id="progresso"></i></div>
+      </div>
+    </div>
+  </header>
+
+  <section class="controles">
+    <div class="grupo">
+      <span class="titulo">1 · Segmento do cliente</span>
+      <div class="fichas" id="fichasSegmento"></div>
+    </div>
+    <div class="grupo">
+      <span class="titulo">2 · Humor da campanha</span>
+      <div class="fichas" id="fichasHumor"></div>
+    </div>
+    <div class="acoes">
+      <button class="botao-mestre" id="btnGerar">Gerar campanha</button>
+      <button class="botao-simples" id="btnSom">▶ Tocar trilha</button>
+      <button class="botao-simples" id="btnCopiar">Copiar briefing</button>
+      <button class="botao-simples" id="btnBaixar">Baixar arte (PNG)</button>
+    </div>
+  </section>
+
+  <section class="palco">
+    <article class="cartao" id="cartaoConceito">
+      <span class="etiqueta" id="etiqueta">Estúdio pronto · escolha e gere</span>
+      <h2 class="codinome" id="codinome">Aperte gerar</h2>
+      <p class="tagline" id="tagline">Escolha um segmento, escolha um humor e deixe o estúdio trabalhar.</p>
+
+      <div class="bloco">
+        <h3>Público-alvo</h3>
+        <p id="publico">—</p>
+      </div>
+
+      <div class="bloco">
+        <h3>Tom de voz</h3>
+        <p id="tom">—</p>
+      </div>
+
+      <div class="bloco">
+        <h3>Chamada para ação</h3>
+        <p id="cta">—</p>
+      </div>
+
+      <div class="bloco">
+        <h3>Três ideias de post</h3>
+        <ol class="posts" id="posts"></ol>
+      </div>
+    </article>
+
+    <aside>
+      <div class="cartao" style="padding:18px">
+        <div class="moldura">
+          <canvas id="arte" width="900" height="900"></canvas>
+          <div class="flash" id="flash"></div>
+        </div>
+        <div class="amostras" id="amostras"></div>
+
+        <div class="bloco" style="margin-top:20px">
+          <h3>Combinações exploradas <span id="explorados" style="color:var(--acento)">0/12</span></h3>
+          <div class="mapa" id="mapa"></div>
+        </div>
+      </div>
+    </aside>
+  </section>
+
+  <footer class="rodape">
+    Atalhos: <kbd>Espaço</kbd> gera uma campanha nova · <kbd>S</kbd> liga e desliga a trilha.<br>
+    Tudo nesta página é desenhado e tocado em código, ao vivo. Nenhuma imagem ou áudio pronto foi usado.
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* ==================================================================
+   [1] PALETAS — AS CORES DE CADA HUMOR   ← MEXA AQUI PARA MUDAR CORES
+   ------------------------------------------------------------------
+   Cada humor carrega um tema completo, não só uma cor de destaque.
+   Por que assim? Porque humor não é enfeite: "minimalista" pede fundo
+   claro e respiro, "ousado" pede escuridão e contraste. Trocar a página
+   inteira é o que vende a ideia na frente do cliente.
+
+   fundo/superficie/texto/suave/linha = a interface
+   acento/acento2                     = os destaques
+   arte[]                             = as tintas que o canvas usa
+   claro:true                         = avisa que é um tema de fundo claro
+=================================================================== */
+const PALETAS = {
+  ousado: {
+    fundo:'#0D0B12', superficie:'#17131F', texto:'#FFFFFF', suave:'#B9AEC9',
+    linha:'rgba(255,255,255,.13)', acento:'#FF2E4D', acento2:'#FFE600',
+    arte:['#FF2E4D','#FF7A00','#FFE600','#12F2C0','#7B2CFF'],
+    fundoArte:'#0A0810', vinheta:.62
+  },
+  nostalgico: {
+    fundo:'#191310', superficie:'#241B15', texto:'#F6E9D8', suave:'#BFA184',
+    linha:'rgba(246,233,216,.15)', acento:'#E8A25C', acento2:'#C4614A',
+    arte:['#E8B07A','#C97B5A','#8C5E4A','#F2DFC4','#D9A25E'],
+    fundoArte:'#2A1D12', vinheta:.40
+  },
+  minimalista: {
+    fundo:'#F2F0EB', superficie:'#FFFFFF', texto:'#14161A', suave:'#6B7078',
+    linha:'rgba(20,22,26,.13)', acento:'#1E5AFF', acento2:'#14161A',
+    arte:['#14161A','#9AA0A6','#1E5AFF','#DAD6CE','#FFFFFF'],
+    fundoArte:'#F7F6F2', vinheta:.30, claro:true
+  }
+};
+
+/* ==================================================================
+   [2] BANCO DE PALAVRAS — O CÉREBRO DO GERADOR  ← MEXA AQUI P/ TEXTOS
+   ------------------------------------------------------------------
+   Não existe IA aqui: existe um baralho bem editado. Cada segmento
+   guarda o vocabulário do mercado dele; cada humor guarda a ATITUDE.
+   O conceito nasce do cruzamento dos dois — é assim que "moda ousada"
+   sai diferente de "moda nostálgica" usando a mesma estrutura.
+
+   Regra prática: quanto melhores as frases que você escrever aqui,
+   melhor o briefing. Pode apagar as minhas e colocar as suas.
+=================================================================== */
+const BANCO = {
+  segmentos: {
+    moda: {
+      rotulo:'Moda',
+      codinomes:['VITRINE','ALFAIATE','COSTURA','PASSARELA','PROVADOR','TECIDO'],
+      objetos:['o guarda-roupa','a passarela','o provador','o look de segunda-feira','a peça que ninguém teve coragem de usar'],
+      verbos:['vestir','reinventar','ocupar','desmontar'],
+      tribos:['gente que monta o look antes de montar a agenda','criativos que usam roupa como assinatura','quem compra menos e escolhe muito melhor'],
+      desejos:['ser reconhecido de longe','vestir a própria história','ocupar espaço sem pedir desculpa'],
+      habitos:['salva referência no Pinterest às duas da manhã','fotografa vitrine no meio da rua','pergunta a marca da peça dentro do elevador'],
+      formatos:['Reels de 15 segundos','Carrossel de 5 cards','Outdoor em avenida movimentada','Vitrine viva com QR code','Editorial em três fotos'],
+      acoes:['mostrar o antes e o depois de','criar um ritual em torno de','fazer um manual de','provocar uma discussão sobre','documentar 24 horas de']
+    },
+    alimentos: {
+      rotulo:'Alimentos',
+      codinomes:['FERMENTO','SAFRA','PANELA','SAL','COLHEITA','MESA'],
+      objetos:['a mesa de domingo','o cheiro que vem da cozinha','o primeiro gole','a receita da avó','o lanche das três da tarde'],
+      verbos:['servir','provar','partilhar','temperar'],
+      tribos:['gente que cozinha para conversar','quem lê rótulo antes de colocar no carrinho','pessoas que planejam a viagem pelo restaurante'],
+      desejos:['comer sem culpa e sem discurso','sentir que alguém cuidou','ter tempo de sentar à mesa'],
+      habitos:['manda foto do prato antes da primeira garfada','guarda o pote de vidro achando que vai usar','confia mais na indicação do amigo que no anúncio'],
+      formatos:['Reels de 15 segundos','Carrossel de 5 cards','Ação de degustação na rua','Embalagem que vira convite','Documentário curto de 2 minutos'],
+      acoes:['mostrar o antes e o depois de','criar um ritual em torno de','fazer um manual de','contar a origem de','documentar 24 horas de']
+    },
+    tech: {
+      rotulo:'Tech',
+      codinomes:['PROTOCOLO','CIRCUITO','SINAL','BETA','REDE','NÓ'],
+      objetos:['a caixa de entrada','o tempo que o app devolve','a senha que ninguém lembra','a reunião que podia ser um clique','o dado que ficou perdido'],
+      verbos:['simplificar','conectar','automatizar','destravar'],
+      tribos:['times pequenos que fazem trabalho de time grande','fundadores que decidem no domingo à noite','profissionais afogados em abas abertas'],
+      desejos:['recuperar duas horas por dia','parar de depender de gambiarra','entender o próprio negócio em um olhar'],
+      habitos:['testa a ferramenta antes de falar com vendas','pesquisa no fórum antes de ler o site','abandona o cadastro se pedir cartão'],
+      formatos:['Reels de 15 segundos','Carrossel de 5 cards','Painel em evento do setor','Demonstração ao vivo de 90 segundos','Página única com um só botão'],
+      acoes:['mostrar o antes e o depois de','criar um ritual em torno de','fazer um manual de','desmontar o mito de','documentar 24 horas de']
+    },
+    beleza: {
+      rotulo:'Beleza',
+      codinomes:['PELE','ESPELHO','RITUAL','BRILHO','PORO','BANHEIRO'],
+      objetos:['o espelho às sete da manhã','a pele real, sem filtro','a prateleira do banheiro','o ritual de cinco minutos','a foto sem retoque'],
+      verbos:['cuidar','revelar','assumir','descomplicar'],
+      tribos:['quem cansou de rotina de doze passos','gente que quer ingrediente explicado em português','pessoas que aprenderam a se olhar com calma'],
+      desejos:['gostar do reflexo antes de sair de casa','ter uma rotina que cabe na vida real','parar de comprar promessa'],
+      habitos:['lê a lista de ingredientes no corredor da loja','assiste review antes de comprar qualquer coisa','tem três produtos abertos ao mesmo tempo'],
+      formatos:['Reels de 15 segundos','Carrossel de 5 cards','Espelho interativo na loja','Antes e depois em tempo real','Editorial em três fotos'],
+      acoes:['mostrar o antes e o depois de','criar um ritual em torno de','fazer um manual de','derrubar o padrão de','documentar 24 horas de']
+    }
+  },
+
+  humores: {
+    ousado: {
+      rotulo:'Ousado',
+      prefixos:['MANIFESTO','MOTIM','CHOQUE','OPERAÇÃO','ALTA VOLTAGEM'],
+      /* {Objeto} = objeto com a primeira letra maiúscula (para começar frase)
+         {objeto}, {verbo}, {desejo} = trocados na hora pelo sorteio */
+      taglines:[
+        '{Verbo} {objeto}. Sem pedir licença.',
+        'Se incomodou, é porque funcionou.',
+        '{Objeto} não é para todo mundo. É para você.',
+        'A gente não pediu permissão para {verbo} {objeto}.'
+      ],
+      tratamentos:[
+        'corte seco, tipografia gritada e cor que não pede licença',
+        'flash direto, sem retoque, com legenda que provoca',
+        'câmera na mão e um texto que cabe em quatro palavras'
+      ],
+      faixa:'18 a 29 anos, urbano, sempre online',
+      tom:'Direto, curto e provocador. Frases que cabem num grito e não pedem desculpa. Zero corporativês.',
+      cta:'Arrasta pra cima e assume.'
+    },
+    nostalgico: {
+      rotulo:'Nostálgico',
+      prefixos:['ARQUIVO','REVIVAL','ÁLBUM','MEMÓRIA','FITA'],
+      taglines:[
+        'Tem coisa que a gente não esquece: {objeto}.',
+        'Do jeito que era bom. E continua sendo.',
+        '{Objeto} tem cheiro de quando a gente era feliz.',
+        'Voltar a {verbo} {objeto} é voltar pra casa.'
+      ],
+      tratamentos:[
+        'granulado de filme, luz dourada e trilha em fita cassete',
+        'foto de álbum de família com legenda escrita à mão',
+        'transição lenta, cor desbotada e narração em primeira pessoa'
+      ],
+      faixa:'30 a 49 anos, com memória afetiva de marca',
+      tom:'Afetivo e em primeira pessoa. Fala como quem conta um caso à mesa, com calma e detalhe.',
+      cta:'Marca quem viveu isso com você.'
+    },
+    minimalista: {
+      rotulo:'Minimalista',
+      prefixos:['ESTUDO','ESSÊNCIA','LINHA','SILÊNCIO','GRAU ZERO'],
+      taglines:[
+        '{Objeto}. Só isso.',
+        'Menos ruído. Mais {desejo}.',
+        'O necessário, muito bem feito.',
+        '{Verbo} {objeto}. Nada além.'
+      ],
+      tratamentos:[
+        'muito espaço em branco, uma única palavra e sombra suave',
+        'objeto centralizado, fundo neutro e nenhuma distração',
+        'preto no branco, uma linha fina e silêncio visual'
+      ],
+      faixa:'28 a 45 anos, repertório visual apurado',
+      tom:'Sóbrio e preciso. Nenhuma palavra a mais. O silêncio também comunica.',
+      cta:'Saiba mais.'
+    }
+  }
+};
+
+/* ==================================================================
+   [3] TRILHAS — O SOM DE CADA HUMOR      ← MEXA AQUI PARA MUDAR SONS
+   ------------------------------------------------------------------
+   Não uso arquivo de música: monto o som do zero com o Web Audio, que
+   já vem no navegador. Assim funciona offline e cada humor soa diferente.
+
+   bpm      = velocidade (quanto maior, mais acelerado)
+   onda     = timbre: 'sawtooth' áspero, 'square' eletrônico,
+              'triangle' macio, 'sine' puro e redondo
+   raiz     = nota base em Hz (quanto menor, mais grave)
+   escala   = quais notas podem tocar (em semitons a partir da raiz)
+   filtro   = corte de agudos em Hz (menor = mais abafado, tipo fita)
+   grave/batida/brilho = padrões de 16 tempos. 0 = silêncio, 1 = toca.
+              Na batida: 1 = bumbo, 2 = caixa, 3 = chimbal.
+=================================================================== */
+const TRILHAS = {
+  ousado: {
+    bpm:126, onda:'sawtooth', raiz:55, escala:[0,3,5,6,7,10], filtro:5200, volume:.30, tremor:0,
+    grave: [1,0,1,0, 1,0,0,1, 1,0,1,0, 1,0,1,1],
+    batida:[1,0,3,0, 2,0,3,1, 1,0,3,0, 2,0,3,3],
+    brilho:[0,0,1,0, 0,0,0,1, 0,1,0,0, 0,0,1,1]
+  },
+  nostalgico: {
+    bpm:74, onda:'triangle', raiz:130.81, escala:[0,2,4,7,9,12], filtro:1500, volume:.34, tremor:9,
+    grave: [1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,0,0],
+    batida:[0,0,3,0, 0,0,0,0, 0,0,3,0, 0,0,0,3],
+    brilho:[1,0,0,1, 0,1,0,0, 1,0,0,1, 0,0,1,0]
+  },
+  minimalista: {
+    bpm:58, onda:'sine', raiz:174.61, escala:[0,7,12,14,19], filtro:2600, volume:.32, tremor:0,
+    grave: [1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+    batida:[0,0,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+    brilho:[0,0,0,0, 0,0,1,0, 0,0,0,0, 0,1,0,0]
+  }
+};
+
+/* ==================================================================
+   FERRAMENTAS BÁSICAS
+   Um gerador de números "aleatórios com semente". Por que não usar o
+   Math.random puro no desenho? Porque com semente, o MESMO conceito
+   sempre desenha a MESMA arte — se o cliente pedir para voltar, a peça
+   volta igual. Semente diferente, arte diferente.
+=================================================================== */
+function criarSorteio(semente){
+  let s = semente >>> 0;
+  return function(){
+    s |= 0; s = (s + 0x6D2B79F5) | 0;
+    let t = Math.imul(s ^ (s >>> 15), 1 | s);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+// Escolhe um item de uma lista usando o sorteio recebido.
+const pegar = (lista, rnd) => lista[Math.floor(rnd() * lista.length)];
+// Primeira letra maiúscula (para quando a palavra abre a frase).
+const maiuscula = txt => txt.charAt(0).toUpperCase() + txt.slice(1);
+
+/* Embaralha uma cópia da lista. Por que copiar (slice) antes? Porque
+   embaralhar a lista original bagunçaria o BANCO para sempre. Uso isto
+   para tirar itens "como quem tira carta do baralho": assim os três
+   posts nunca repetem o mesmo formato, a mesma ação ou o mesmo tratamento. */
+function baralhar(lista, rnd){
+  const copia = lista.slice();
+  for(let i = copia.length - 1; i > 0; i--){
+    const j = Math.floor(rnd() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+/* Português correto: "manual de a passarela" não existe, o certo é
+   "manual da passarela". Como as frases são montadas por encaixe, faço
+   aqui a junção das preposições no final — um único lugar para consertar. */
+function contrair(frase){
+  return frase
+    .replace(/\bde o\b/g,'do').replace(/\bde a\b/g,'da')
+    .replace(/\bde os\b/g,'dos').replace(/\bde as\b/g,'das')
+    .replace(/\bem o\b/g,'no').replace(/\bem a\b/g,'na');
+}
+
+/* ==================================================================
+   ESTADO DO ESTÚDIO
+   Tudo que a página precisa lembrar fica neste objeto só. Facilita:
+   quando algo parece errado, você olha um lugar apenas.
+=================================================================== */
+const estado = {
+  segmento:'moda',
+  humor:'ousado',
+  conceito:null,
+  resolvidos:0,
+  combinacoes:new Set(),   // guarda "moda|ousado" etc. para o mapa do game
+  tocando:false
+};
+
+/* ==================================================================
+   O GERADOR DE CONCEITO
+   Recebe segmento + humor, sorteia as peças e devolve um briefing
+   pronto. Ele não mexe na tela: só produz o conteúdo. Separar
+   "produzir" de "mostrar" é o que deixa o código fácil de ajustar.
+=================================================================== */
+function gerarConceito(chaveSeg, chaveHumor){
+  const seg = BANCO.segmentos[chaveSeg];
+  const hum = BANCO.humores[chaveHumor];
+
+  // A semente vem do relógio: cada clique é um universo novo,
+  // mas fica guardada para podermos redesenhar a mesma arte.
+  const semente = Date.now() % 1000000;
+  const rnd = criarSorteio(semente);
+
+  const objeto = pegar(seg.objetos, rnd);
+  const verbo  = pegar(seg.verbos, rnd);
+  const desejo = pegar(seg.desejos, rnd);
+
+  // Monta a tagline trocando os marcadores {} pelas palavras sorteadas.
+  const tagline = pegar(hum.taglines, rnd)
+    .replace('{Objeto}', maiuscula(objeto))
+    .replace('{objeto}', objeto)
+    .replace('{Verbo}', maiuscula(verbo))
+    .replace('{verbo}', verbo)
+    .replace('{desejo}', desejo);
+
+  const publico = hum.faixa + '. ' + maiuscula(pegar(seg.tribos, rnd)) +
+                  '. ' + maiuscula(pegar(seg.habitos, rnd)) + ' e quer ' + desejo + '.';
+
+  /* Três posts, todos diferentes entre si. Embaralho cada lista e pego
+     uma carta por post: sem isso, o sorteio repetiria o mesmo formato ou
+     o mesmo tratamento nas três ideias e a campanha pareceria preguiçosa.
+     O objeto do post 1 é o mesmo da tagline (para a campanha ter foco);
+     os outros dois trazem variação sem sair do universo do segmento. */
+  const formatos    = baralhar(seg.formatos, rnd);
+  const acoes       = baralhar(seg.acoes, rnd);
+  const tratamentos = baralhar(hum.tratamentos, rnd);
+  const outros      = baralhar(seg.objetos.filter(o => o !== objeto), rnd);
+  const objetosPost = [objeto, outros[0], outros[1]];
+
+  const posts = [];
+  for(let i = 0; i < 3; i++){
+    posts.push({
+      formato: formatos[i],
+      ideia: contrair(maiuscula(acoes[i]) + ' ' + objetosPost[i] +
+                      ', com ' + tratamentos[i % tratamentos.length] + '.')
+    });
+  }
+
+  return {
+    codinome: pegar(hum.prefixos, rnd) + ' ' + pegar(seg.codinomes, rnd),
+    tagline, publico, posts, semente,
+    tom: hum.tom,
+    cta: hum.cta,
+    segmento: seg.rotulo,
+    humor: hum.rotulo
+  };
+}
+
+/* ==================================================================
+   O TEMA: o humor pinta a página inteira
+   Trocamos as variáveis do CSS pelo JavaScript. Uma linha aqui muda
+   dezenas de elementos lá — é a mágica das variáveis.
+=================================================================== */
+function aplicarTema(chaveHumor){
+  const p = PALETAS[chaveHumor];
+  const raiz = document.documentElement.style;
+  raiz.setProperty('--fundo', p.fundo);
+  raiz.setProperty('--superficie', p.superficie);
+  raiz.setProperty('--texto', p.texto);
+  raiz.setProperty('--suave', p.suave);
+  raiz.setProperty('--linha', p.linha);
+  raiz.setProperty('--acento', p.acento);
+  raiz.setProperty('--acento2', p.acento2);
+  // Tema claro precisa de sombra mais leve, senão a página fica suja.
+  raiz.setProperty('--sombra', p.claro ? '0 20px 50px rgba(20,22,26,.10)' : '0 24px 60px rgba(0,0,0,.45)');
+  document.body.classList.toggle('claro', !!p.claro);
+
+  // As amostras de cor embaixo da arte (a "paleta" para o cliente ver).
+  document.getElementById('amostras').innerHTML =
+    p.arte.map(cor => '<i style="background:' + cor + '" title="' + cor + '"></i>').join('');
+}
+
+/* ==================================================================
+   A PALETA VIVA (a arte generativa)
+   Cada humor tem sua própria receita de desenho. Tudo é forma
+   geométrica desenhada por código: nenhuma imagem foi carregada.
+   A arte respira (anima devagar) porque uma peça parada parece um
+   print; uma peça que se move parece um estúdio ligado.
+=================================================================== */
+const tela = document.getElementById('arte');
+const pincel = tela.getContext('2d');
+let formas = [];          // a "composição" sorteada do conceito atual
+let inicioAnimacao = 0;
+
+function montarComposicao(){
+  const p = PALETAS[estado.humor];
+  const rnd = criarSorteio(estado.conceito ? estado.conceito.semente : 1);
+  formas = [];
+
+  if(estado.humor === 'ousado'){
+    // Ousado = colisão. Faixas diagonais grandes + formas duras que se
+    // sobrepõem. Poucas formas, todas gritando alto.
+    for(let i = 0; i < 5; i++){
+      formas.push({tipo:'faixa', y:rnd(), altura:.06 + rnd() * .16, giro:-.5 + rnd(),
+                   cor:pegar(p.arte, rnd), vel:.15 + rnd() * .4});
+    }
+    for(let i = 0; i < 7; i++){
+      formas.push({tipo:'bloco', x:rnd(), y:rnd(), t:.10 + rnd() * .28,
+                   cor:pegar(p.arte, rnd), lados:rnd() > .5 ? 3 : 4, vel:.2 + rnd()});
+    }
+    formas.push({tipo:'anel', x:.5 + (rnd() - .5) * .3, y:.5 + (rnd() - .5) * .3,
+                 r:.26 + rnd() * .14, cor:pegar(p.arte, rnd), grossura:.03 + rnd() * .04, vel:.3});
+  }
+
+  if(estado.humor === 'nostalgico'){
+    // Nostálgico = memória desfocada. Círculos macios com degradê,
+    // luz quente e listras de fita atravessando.
+    for(let i = 0; i < 9; i++){
+      formas.push({tipo:'nuvem', x:rnd(), y:rnd(), r:.12 + rnd() * .30,
+                   cor:pegar(p.arte, rnd), vel:.05 + rnd() * .15});
+    }
+    for(let i = 0; i < 4; i++){
+      formas.push({tipo:'fita', y:(i + rnd()) / 4, altura:.004 + rnd() * .014,
+                   cor:pegar(p.arte, rnd), vel:.03 + rnd() * .08});
+    }
+    formas.push({tipo:'sol', x:.3 + rnd() * .4, y:.28 + rnd() * .3, r:.16 + rnd() * .1, cor:p.arte[3]});
+    // Um anel nítido no meio de tanto borrão: o olho precisa de um ponto
+    // firme para descansar, senão a peça vira só névoa bonita.
+    formas.push({tipo:'contorno', x:.5 + (rnd() - .5) * .2, y:.45 + (rnd() - .5) * .2,
+                 r:.20 + rnd() * .10, cor:p.arte[3], vel:.03});
+  }
+
+  if(estado.humor === 'minimalista'){
+    // Minimalista = o que você NÃO desenha. Três, quatro elementos no
+    // máximo, muito vazio em volta. O respiro é o design.
+    formas.push({tipo:'moldura', margem:.12 + rnd() * .05, cor:p.arte[1]});
+    formas.push({tipo:'contorno', x:.5, y:.46, r:.20 + rnd() * .08, cor:p.arte[0], vel:.02});
+    formas.push({tipo:'ponto', x:.5 + (rnd() - .5) * .4, y:.5 + (rnd() - .5) * .4,
+                 r:.018 + rnd() * .02, cor:p.arte[2], vel:.06});
+    for(let i = 0; i < 2; i++){
+      formas.push({tipo:'risco', y:.2 + rnd() * .6, largura:.3 + rnd() * .45,
+                   cor:i === 0 ? p.arte[0] : p.arte[2], vel:.04});
+    }
+  }
+}
+
+function desenhar(agora){
+  const L = tela.width, A = tela.height;
+  const p = PALETAS[estado.humor];
+  // t = tempo em segundos. É ele que faz as formas "respirarem".
+  const t = (agora - inicioAnimacao) / 1000;
+
+  pincel.globalAlpha = 1;
+  pincel.globalCompositeOperation = 'source-over';
+  pincel.fillStyle = p.fundoArte;
+  pincel.fillRect(0, 0, L, A);
+
+  // 'screen' no escuro faz as cores somarem e brilharem na sobreposição;
+  // no tema claro usamos 'multiply', que escurece como tinta em papel.
+  pincel.globalCompositeOperation = p.claro ? 'multiply' : 'screen';
+
+  formas.forEach((f, i) => {
+    // Cada forma anda no seu próprio ritmo: o "sopro" que evita
+    // a sensação de imagem congelada.
+    const sopro = Math.sin(t * (f.vel || .1) + i) * .5 + .5;
+    pincel.fillStyle = f.cor;
+    pincel.strokeStyle = f.cor;
+
+    if(f.tipo === 'faixa'){
+      pincel.save();
+      pincel.translate(L / 2, A * f.y);
+      pincel.rotate(f.giro * .6 + sopro * .06);
+      pincel.globalAlpha = .85;
+      pincel.fillRect(-L, -A * f.altura / 2, L * 2, A * f.altura);
+      pincel.restore();
+    }
+
+    if(f.tipo === 'bloco'){
+      const tam = A * f.t * (.85 + sopro * .3);
+      pincel.save();
+      pincel.translate(L * f.x, A * f.y);
+      pincel.rotate(t * f.vel * .3);
+      pincel.globalAlpha = .9;
+      pincel.beginPath();
+      for(let k = 0; k < f.lados; k++){
+        const ang = (k / f.lados) * Math.PI * 2;
+        pincel[k === 0 ? 'moveTo' : 'lineTo'](Math.cos(ang) * tam, Math.sin(ang) * tam);
+      }
+      pincel.closePath(); pincel.fill();
+      pincel.restore();
+    }
+
+    if(f.tipo === 'anel'){
+      pincel.globalAlpha = 1;
+      pincel.lineWidth = A * f.grossura;
+      pincel.beginPath();
+      pincel.arc(L * f.x, A * f.y, A * f.r * (.9 + sopro * .2), 0, Math.PI * 2);
+      pincel.stroke();
+    }
+
+    if(f.tipo === 'nuvem'){
+      // Degradê radial: o miolo tem cor e a borda some. É o que dá o
+      // ar de foto antiga meio fora de foco.
+      const cx = L * f.x + Math.sin(t * f.vel + i) * L * .04;
+      const cy = A * f.y + Math.cos(t * f.vel * .8 + i) * A * .04;
+      const raio = A * f.r * (.9 + sopro * .18);
+      const g = pincel.createRadialGradient(cx, cy, 0, cx, cy, raio);
+      g.addColorStop(0, f.cor); g.addColorStop(1, 'rgba(0,0,0,0)');
+      pincel.fillStyle = g; pincel.globalAlpha = .8;
+      pincel.beginPath(); pincel.arc(cx, cy, raio, 0, Math.PI * 2); pincel.fill();
+    }
+
+    if(f.tipo === 'sol'){
+      const g = pincel.createRadialGradient(L * f.x, A * f.y, 0, L * f.x, A * f.y, A * f.r * 2);
+      g.addColorStop(0, f.cor); g.addColorStop(1, 'rgba(0,0,0,0)');
+      pincel.fillStyle = g; pincel.globalAlpha = .95;
+      pincel.beginPath(); pincel.arc(L * f.x, A * f.y, A * f.r * 2, 0, Math.PI * 2); pincel.fill();
+    }
+
+    if(f.tipo === 'fita'){
+      pincel.globalAlpha = .5;
+      const desloc = (t * f.vel * 60) % A;
+      pincel.fillRect(0, (A * f.y + desloc) % A, L, A * f.altura);
+    }
+
+    if(f.tipo === 'contorno'){
+      pincel.globalAlpha = 1; pincel.lineWidth = 2;
+      pincel.beginPath();
+      pincel.arc(L * f.x, A * f.y, A * f.r * (.99 + sopro * .02), 0, Math.PI * 2);
+      pincel.stroke();
+    }
+
+    if(f.tipo === 'ponto'){
+      pincel.globalAlpha = 1;
+      pincel.beginPath();
+      pincel.arc(L * f.x, A * f.y + Math.sin(t * f.vel) * A * .02, A * f.r, 0, Math.PI * 2);
+      pincel.fill();
+    }
+
+    if(f.tipo === 'moldura'){
+      // Uma moldura fina só sugere o limite da peça. No minimalismo,
+      // a linha existe para organizar o vazio, não para preenchê-lo.
+      pincel.globalAlpha = .55; pincel.lineWidth = 1;
+      pincel.strokeRect(L * f.margem, A * f.margem, L * (1 - f.margem * 2), A * (1 - f.margem * 2));
+    }
+
+    if(f.tipo === 'risco'){
+      pincel.globalAlpha = .8; pincel.lineWidth = 1.5;
+      pincel.beginPath();
+      pincel.moveTo(L * .5 - L * f.largura / 2, A * f.y);
+      pincel.lineTo(L * .5 + L * f.largura / 2, A * f.y);
+      pincel.stroke();
+    }
+  });
+
+  // Vinheta: escurece as bordas (ou clareia, no tema claro) para o olho
+  // ir ao centro. É o truque mais barato para uma peça parecer fotografia.
+  pincel.globalCompositeOperation = 'source-over';
+  const v = pincel.createRadialGradient(L/2, A/2, A * .3, L/2, A/2, A * .78);
+  v.addColorStop(0, 'rgba(0,0,0,0)');
+  v.addColorStop(1, p.claro ? 'rgba(255,255,255,' + p.vinheta + ')'
+                           : 'rgba(0,0,0,' + p.vinheta + ')');
+  pincel.fillStyle = v; pincel.globalAlpha = 1;
+  pincel.fillRect(0, 0, L, A);
+
+  requestAnimationFrame(desenhar);
+}
+
+/* ==================================================================
+   A TRILHA (Web Audio, som feito na hora)
+   O navegador só libera áudio depois de um clique do usuário — por isso
+   o contexto de som só é criado quando você aperta um botão.
+=================================================================== */
+let audio = null;          // guarda o "estúdio de som" depois de criado
+let passo = 0;             // em qual dos 16 tempos estamos
+let proximoTempo = 0;      // quando o próximo tempo deve tocar
+let relogio = null;        // o agendador que fica olhando o futuro
+
+function ligarAudio(){
+  if(audio) return audio;
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  const mestre = ctx.createGain(); mestre.gain.value = .8;
+  // O compressor evita estouro quando bumbo e baixo tocam juntos.
+  const limitador = ctx.createDynamicsCompressor();
+  mestre.connect(limitador); limitador.connect(ctx.destination);
+
+  // Reverb feito de ruído que decai: dá o "tamanho da sala" sem baixar arquivo.
+  const eco = ctx.createConvolver();
+  const dur = 2.6, quadros = ctx.sampleRate * dur;
+  const buffer = ctx.createBuffer(2, quadros, ctx.sampleRate);
+  for(let canal = 0; canal < 2; canal++){
+    const dados = buffer.getChannelData(canal);
+    for(let i = 0; i < quadros; i++){
+      dados[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / quadros, 2.4);
+    }
+  }
+  eco.buffer = buffer;
+  const envio = ctx.createGain(); envio.gain.value = .3;
+  envio.connect(eco); eco.connect(mestre);
+
+  audio = {ctx, mestre, envio};
+  return audio;
+}
+
+// Uma nota: oscilador -> filtro -> envelope de volume -> saída.
+// O envelope é o que diferencia um "tec" de um "tuuum".
+function nota(freq, quando, duracao, opcoes){
+  const {ctx, mestre, envio} = audio;
+  const cfg = opcoes || {};
+  const osc = ctx.createOscillator();
+  const filtro = ctx.createBiquadFilter();
+  const vol = ctx.createGain();
+
+  osc.type = cfg.onda || 'sine';
+  osc.frequency.setValueAtTime(freq, quando);
+  if(cfg.tremor) osc.detune.setValueAtTime((Math.random() - .5) * cfg.tremor * 2, quando);
+
+  filtro.type = 'lowpass';
+  filtro.frequency.setValueAtTime(cfg.filtro || 4000, quando);
+
+  const pico = cfg.volume || .2;
+  const ataque = cfg.ataque || .01;
+  vol.gain.setValueAtTime(0.0001, quando);
+  vol.gain.exponentialRampToValueAtTime(pico, quando + ataque);
+  vol.gain.exponentialRampToValueAtTime(0.0001, quando + duracao);
+
+  osc.connect(filtro); filtro.connect(vol);
+  vol.connect(mestre); vol.connect(envio);
+  osc.start(quando); osc.stop(quando + duracao + .05);
+}
+
+// Percussão feita de ruído branco (chimbal/caixa) ou de um seno que
+// despenca de tom (bumbo). Mesma lógica de sempre: fonte + filtro + envelope.
+function percussao(quando, tipo){
+  const {ctx, mestre, envio} = audio;
+
+  if(tipo === 1){ // bumbo
+    const osc = ctx.createOscillator(), vol = ctx.createGain();
+    osc.frequency.setValueAtTime(140, quando);
+    osc.frequency.exponentialRampToValueAtTime(45, quando + .12);
+    vol.gain.setValueAtTime(.7, quando);
+    vol.gain.exponentialRampToValueAtTime(.001, quando + .3);
+    osc.connect(vol); vol.connect(mestre);
+    osc.start(quando); osc.stop(quando + .32);
+    return;
+  }
+
+  const comprimento = ctx.sampleRate * .25;
+  const buffer = ctx.createBuffer(1, comprimento, ctx.sampleRate);
+  const dados = buffer.getChannelData(0);
+  for(let i = 0; i < comprimento; i++) dados[i] = Math.random() * 2 - 1;
+
+  const fonte = ctx.createBufferSource(); fonte.buffer = buffer;
+  const filtro = ctx.createBiquadFilter();
+  const vol = ctx.createGain();
+
+  if(tipo === 2){ // caixa: corpo médio, estala
+    filtro.type = 'bandpass'; filtro.frequency.value = 1900;
+    vol.gain.setValueAtTime(.30, quando);
+    vol.gain.exponentialRampToValueAtTime(.001, quando + .18);
+  } else {        // chimbal: só agudo, bem curtinho
+    filtro.type = 'highpass'; filtro.frequency.value = 7200;
+    vol.gain.setValueAtTime(.13, quando);
+    vol.gain.exponentialRampToValueAtTime(.001, quando + .05);
+  }
+
+  fonte.connect(filtro); filtro.connect(vol);
+  vol.connect(mestre); vol.connect(envio);
+  fonte.start(quando); fonte.stop(quando + .25);
+}
+
+// Transforma "semitons a partir da raiz" em frequência.
+// Cada 12 semitons dobra a frequência: é assim que a música funciona.
+const paraHz = (raiz, semitons) => raiz * Math.pow(2, semitons / 12);
+
+function tocarPasso(indice, quando){
+  const t = TRILHAS[estado.humor];
+
+  if(t.grave[indice]){
+    nota(paraHz(t.raiz, t.escala[indice % t.escala.length]), quando, 60 / t.bpm * .9, {
+      onda:t.onda, filtro:t.filtro, volume:t.volume, tremor:t.tremor, ataque:.02
+    });
+  }
+  if(t.batida[indice]) percussao(quando, t.batida[indice]);
+  if(t.brilho[indice]){
+    // Duas oitavas acima: o brilho que fica por cima da base.
+    nota(paraHz(t.raiz, t.escala[(indice * 3) % t.escala.length] + 24), quando, 60 / t.bpm * 1.6, {
+      onda:t.onda === 'sawtooth' ? 'square' : t.onda,
+      filtro:t.filtro * 1.6, volume:t.volume * .5, tremor:t.tremor, ataque:.03
+    });
+  }
+}
+
+/* Agendador com "olhar para frente": em vez de tocar a nota na hora
+   (o que sairia torto, porque o navegador atrasa), eu agendo os
+   próximos 200 milissegundos no relógio preciso da placa de som. */
+function agendar(){
+  const ctx = audio.ctx;
+  const passoSeg = (60 / TRILHAS[estado.humor].bpm) / 4;
+  while(proximoTempo < ctx.currentTime + .2){
+    tocarPasso(passo, proximoTempo);
+    proximoTempo += passoSeg;
+    passo = (passo + 1) % 16;
+  }
+}
+
+function alternarTrilha(){
+  ligarAudio();
+  if(audio.ctx.state === 'suspended') audio.ctx.resume();
+
+  if(estado.tocando){
+    clearInterval(relogio); relogio = null;
+    estado.tocando = false;
+    document.getElementById('btnSom').textContent = '▶ Tocar trilha';
+  } else {
+    passo = 0;
+    proximoTempo = audio.ctx.currentTime + .08;
+    relogio = setInterval(agendar, 40);
+    estado.tocando = true;
+    document.getElementById('btnSom').textContent = '❚❚ Pausar trilha';
+  }
+}
+
+// Efeito de "campanha aprovada": um sopro rápido subindo de tom.
+function somDeAcerto(){
+  ligarAudio();
+  if(audio.ctx.state === 'suspended') audio.ctx.resume();
+  const t = TRILHAS[estado.humor], agora = audio.ctx.currentTime;
+  [0, 7, 12].forEach((semitom, i) => {
+    nota(paraHz(t.raiz * 2, semitom), agora + i * .07, .5,
+         {onda:t.onda, filtro:t.filtro * 2, volume:.16, ataque:.01});
+  });
+}
+
+/* ==================================================================
+   MODO GAME: placar, nível e mapa de combinações
+   A recompensa precisa ser imediata e visível — é o que faz querer
+   apertar de novo (e é o que faz o cliente pedir para brincar).
+=================================================================== */
+function montarMapa(){
+  const mapa = document.getElementById('mapa');
+  mapa.innerHTML = '';
+  Object.keys(BANCO.segmentos).forEach(seg => {
+    Object.keys(BANCO.humores).forEach(hum => {
+      const marca = document.createElement('span');
+      marca.dataset.chave = seg + '|' + hum;
+      marca.title = BANCO.segmentos[seg].rotulo + ' + ' + BANCO.humores[hum].rotulo;
+      mapa.appendChild(marca);
+    });
+  });
+}
+
+function atualizarPlacar(comemorar){
+  const contador = document.getElementById('contador');
+  contador.textContent = estado.resolvidos;
+
+  // Nível sobe a cada 5 briefings; a barra mostra o quanto falta.
+  const nivel = Math.floor(estado.resolvidos / 5) + 1;
+  document.getElementById('nivel').textContent = nivel;
+  document.getElementById('progresso').style.width = ((estado.resolvidos % 5) / 5 * 100) + '%';
+
+  document.querySelectorAll('#mapa span').forEach(marca => {
+    marca.classList.toggle('aceso', estado.combinacoes.has(marca.dataset.chave));
+  });
+  document.getElementById('explorados').textContent = estado.combinacoes.size + '/12';
+
+  if(comemorar){
+    // Remover e recolocar a classe força a animação a rodar de novo.
+    contador.classList.remove('pula');
+    void contador.offsetWidth;
+    contador.classList.add('pula');
+  }
+
+  // Guarda o progresso no navegador. O try/catch existe porque alguns
+  // navegadores bloqueiam isso — e um placar não pode quebrar a página.
+  try{
+    localStorage.setItem('estudio-campanha', JSON.stringify({
+      resolvidos: estado.resolvidos,
+      combinacoes: Array.from(estado.combinacoes)
+    }));
+  }catch(e){}
+}
+
+function carregarProgresso(){
+  try{
+    const salvo = JSON.parse(localStorage.getItem('estudio-campanha') || '{}');
+    estado.resolvidos = salvo.resolvidos || 0;
+    estado.combinacoes = new Set(salvo.combinacoes || []);
+  }catch(e){}
+}
+
+function soltarConfete(){
+  const cores = PALETAS[estado.humor].arte;
+  for(let i = 0; i < 26; i++){
+    const p = document.createElement('div');
+    p.className = 'confete';
+    p.style.background = cores[i % cores.length];
+    p.style.left = (35 + Math.random() * 30) + 'vw';
+    p.style.top = '18vh';
+    document.body.appendChild(p);
+
+    // A Web Animations API anima direto pelo JS: nada de CSS extra
+    // para cada partícula, e a limpeza é automática no final.
+    p.animate([
+      {transform:'translate(0,0) rotate(0deg)', opacity:1},
+      {transform:'translate(' + (Math.random() * 500 - 250) + 'px,' +
+                 (300 + Math.random() * 320) + 'px) rotate(' +
+                 (Math.random() * 900 - 450) + 'deg)', opacity:0}
+    ], {duration:1200 + Math.random() * 600, easing:'cubic-bezier(.2,.7,.4,1)'})
+     .onfinish = () => p.remove();
+  }
+}
+
+/* ==================================================================
+   MOSTRAR O CONCEITO NA TELA
+   Aqui só pintamos o que o gerador já produziu.
+=================================================================== */
+function mostrarConceito(c){
+  document.getElementById('etiqueta').textContent =
+    'Briefing ' + String(estado.resolvidos).padStart(3, '0') + ' · ' + c.segmento + ' · ' + c.humor;
+  document.getElementById('codinome').textContent = c.codinome;
+  document.getElementById('tagline').textContent = c.tagline;
+  document.getElementById('publico').textContent = c.publico;
+  document.getElementById('tom').textContent = c.tom;
+  document.getElementById('cta').textContent = '“' + c.cta + '”';
+  document.getElementById('posts').innerHTML =
+    c.posts.map(p => '<li><b>' + p.formato + '</b>' + p.ideia + '</li>').join('');
+
+  const cartao = document.getElementById('cartaoConceito');
+  cartao.classList.remove('entra');
+  void cartao.offsetWidth;   // truque para reiniciar a animação
+  cartao.classList.add('entra');
+}
+
+/* ==================================================================
+   A GRANDE AÇÃO: um clique, quatro reações
+=================================================================== */
+function gerarTudo(){
+  estado.conceito = gerarConceito(estado.segmento, estado.humor);
+  estado.resolvidos++;
+  estado.combinacoes.add(estado.segmento + '|' + estado.humor);
+
+  aplicarTema(estado.humor);      // 1. a página muda de humor
+  mostrarConceito(estado.conceito); // 2. o briefing aparece
+  montarComposicao();               // 3. a arte se redesenha
+  atualizarPlacar(true);            // 4. o placar comemora
+
+  const flash = document.getElementById('flash');
+  flash.classList.remove('dispara'); void flash.offsetWidth; flash.classList.add('dispara');
+
+  soltarConfete();
+  somDeAcerto();
+}
+
+/* ==================================================================
+   MONTAGEM DOS BOTÕES E ATALHOS
+   Os botões de escolha nascem a partir do BANCO: se você adicionar um
+   segmento novo lá em cima, o botão aparece aqui sozinho.
+=================================================================== */
+function montarFichas(destinoId, dados, campoEstado){
+  const caixa = document.getElementById(destinoId);
+  Object.keys(dados).forEach(chave => {
+    const b = document.createElement('button');
+    b.className = 'ficha';
+    b.textContent = dados[chave].rotulo;
+    b.setAttribute('aria-pressed', estado[campoEstado] === chave);
+    b.onclick = () => {
+      estado[campoEstado] = chave;
+      caixa.querySelectorAll('.ficha').forEach(o => o.setAttribute('aria-pressed', 'false'));
+      b.setAttribute('aria-pressed', 'true');
+      // Trocar o humor já muda tema, arte e som na hora — antes mesmo
+      // de gerar. É a prévia que deixa a escolha divertida.
+      if(campoEstado === 'humor'){ aplicarTema(chave); montarComposicao(); }
+    };
+    caixa.appendChild(b);
+  });
+}
+
+document.getElementById('btnGerar').onclick = gerarTudo;
+document.getElementById('btnSom').onclick = alternarTrilha;
+
+document.getElementById('btnCopiar').onclick = () => {
+  if(!estado.conceito) return;
+  const c = estado.conceito;
+  const texto =
+    'CAMPANHA: ' + c.codinome + '\nSEGMENTO: ' + c.segmento + ' | HUMOR: ' + c.humor +
+    '\n\nTAGLINE: ' + c.tagline + '\n\nPÚBLICO: ' + c.publico + '\n\nTOM DE VOZ: ' + c.tom + '\n\nCHAMADA: ' + c.cta +
+    '\n\nPOSTS:\n' + c.posts.map((p, i) => (i + 1) + '. [' + p.formato + '] ' + p.ideia).join('\n');
+  // A área de transferência pode ser bloqueada; se falhar, mostro o texto.
+  (navigator.clipboard ? navigator.clipboard.writeText(texto) : Promise.reject())
+    .then(() => {
+      const b = document.getElementById('btnCopiar');
+      b.textContent = '✓ Copiado';
+      setTimeout(() => b.textContent = 'Copiar briefing', 1800);
+    })
+    .catch(() => prompt('Copie o briefing abaixo:', texto));
+};
+
+document.getElementById('btnBaixar').onclick = () => {
+  // toDataURL transforma o desenho do canvas numa imagem PNG de verdade.
+  const link = document.createElement('a');
+  link.download = (estado.conceito ? estado.conceito.codinome.replace(/\s+/g, '-').toLowerCase() : 'arte') + '.png';
+  link.href = tela.toDataURL('image/png');
+  link.click();
+};
+
+// Atalhos de teclado: numa apresentação você não quer caçar o mouse.
+document.addEventListener('keydown', e => {
+  if(e.target.tagName === 'INPUT') return;
+  if(e.code === 'Space'){ e.preventDefault(); gerarTudo(); }
+  if(e.key.toLowerCase() === 's'){ alternarTrilha(); }
+});
+
+/* ==================================================================
+   PARTIDA
+=================================================================== */
+montarFichas('fichasSegmento', BANCO.segmentos, 'segmento');
+montarFichas('fichasHumor', BANCO.humores, 'humor');
+montarMapa();
+carregarProgresso();
+aplicarTema(estado.humor);
+montarComposicao();
+atualizarPlacar(false);
+inicioAnimacao = performance.now();
+requestAnimationFrame(desenhar);
+</script>
+</body>
+</html>
